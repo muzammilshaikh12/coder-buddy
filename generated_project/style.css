@@ -1,0 +1,45 @@
+/* Global Styles */
+
+/* Colors */
+:root {
+  --primary-color: #333;
+  --secondary-color: #666;
+  --background-color: #f9f9f9;
+}
+
+/* Fonts */
+body {
+  font-family: Arial, sans-serif;
+  font-size: 16px;
+}
+
+/* Spacing */
+body {
+  margin: 0;
+  padding: 0;
+}
+
+/* Header Styles */
+.header {
+  background-color: var(--primary-color);
+  color: #fff;
+  padding: 1em;
+  text-align: center;
+}
+
+/* Main Content Styles */
+.main-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 2em;
+}
+
+/* Footer Styles */
+.footer {
+  background-color: var(--secondary-color);
+  color: #fff;
+  padding: 1em;
+  text-align: center;
+  clear: both;
+}
