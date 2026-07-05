@@ -10,54 +10,33 @@ from agent.tools import write_file, read_file, get_current_directory, list_files
 
 _ = load_dotenv()
 
-llm = ChatGroq(model="llama-3.3-70b-versatile")
 
-planner_llm = llm.with_structured_output(Plan)
+llm = ChatGroq(model="openai/gpt-oss-120b")
 
-architect_llm = llm.with_structured_output(TaskPlan)
-
-planner_chain = (
-    PLANNER_PROMPT
-    | planner_llm
-)
-
-architect_chain = (
-    ARCHITECT_PROMPT
-    | architect_llm
-)
 
 def planner_agent(state: dict) -> dict:
-    """
-    Converts the user prompt into a structured Plan.
-    """
-
-    plan = planner_chain.invoke(
-        {
-            "user_prompt": state["user_prompt"]
-        }
+    """Converts user prompt into a structured Plan."""
+    user_prompt = state["user_prompt"]
+    resp = llm.with_structured_output(Plan).invoke(
+        planner_prompt(user_prompt)
     )
-
-    return {
-        "plan": plan
-    }
+    if resp is None:
+        raise ValueError("Planner did not return a valid response.")
+    return {"plan": resp}
 
 
 def architect_agent(state: dict) -> dict:
-    """
-    Converts a Plan into a TaskPlan.
-    """
-
+    """Creates TaskPlan from Plan."""
     plan: Plan = state["plan"]
-
-    task_plan = architect_chain.invoke(
-        {
-            "plan": plan.model_dump_json()
-        }
+    resp = llm.with_structured_output(TaskPlan).invoke(
+        architect_prompt(plan=plan.model_dump_json())
     )
+    if resp is None:
+        raise ValueError("Planner did not return a valid response.")
 
-    return {
-        "task_plan": task_plan
-    }
+    resp.plan = plan
+    print(resp.model_dump_json())
+    return {"task_plan": resp}
 
 
 def coder_agent(state: dict) -> dict:
@@ -73,22 +52,19 @@ def coder_agent(state: dict) -> dict:
     current_task = steps[coder_state.current_step_idx]
     existing_content = read_file.run(current_task.filepath)
 
-    prompt = CODER_PROMPT.invoke(
-        {
-        "task": current_task.task_description,
-        "filepath": current_task.filepath,
-        "current_file_content": existing_content,
-        }
+    system_prompt = coder_system_prompt()
+    user_prompt = (
+        f"Task: {current_task.task_description}\n"
+        f"File: {current_task.filepath}\n"
+        f"Existing content:\n{existing_content}\n"
+        "Use write_file(path, content) to save your changes."
     )
 
     coder_tools = [read_file, write_file, list_files, get_current_directory]
     react_agent = create_agent(llm, coder_tools)
 
-    react_agent.invoke(
-        {
-            "messages": prompt.messages
-        }
-    )
+    react_agent.invoke({"messages": [{"role": "system", "content": system_prompt},
+                                     {"role": "user", "content": user_prompt}]})
 
     coder_state.current_step_idx += 1
     return {"coder_state": coder_state}
